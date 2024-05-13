@@ -1,0 +1,372 @@
+---
+title: "Analysis of Behavior and Attitudes of College Students"
+author: "Yen Jo (Sally) Lee"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: true
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    code_download: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(GGally)
+library(broom)
+library(gridExtra)
+library(DT)
+library(patchwork)
+library(ggthemes)
+library(plotly)
+library(gapminder)
+library(corrplot)
+library(car)
+```
+
+
+
+# Dataset overview.  {.tabset}
+
+
+## Tab 1
+
+### Description of the Dataset
+
+Import, explain the variables, and cite the source(s)
+```{r}
+Student_Attitude_and_Behavior <- read.csv("~/DATA612/project/Student Attitude and Behavior.csv")
+cat(" There are", nrow(Student_Attitude_and_Behavior), "rows, and", ncol(Student_Attitude_and_Behavior),"columns in the Student_Attitude_and_Behavior data." )
+```
+
+
+* [Student Attitude and Behavior]("https://www.kaggle.com/datasets/susanta21/student-attitude-and-behavior/data") The data from the kaggle website, which collects various information about college students through Google Forms to analyze student behavior and attitudes. This data has a total of 19 variables, which includes certification courses, gender, department, height (in cm), weight (in kg), marks in 10th and 12th grade, college marks, hobbies, daily studying time, preferred study environment, salary expectations, satisfaction with their degree and other detailed information. We will present graphical analysis as well as regression analysis for these variables.
+
+
+
+```{r}
+name1 = colnames(Student_Attitude_and_Behavior)[1]
+name2 = colnames(Student_Attitude_and_Behavior)[2]
+names(Student_Attitude_and_Behavior)
+```
+
+
+
+## Tab 2
+
+### Clean and tidy data
+
+
+We change variables name here.
+```{r}
+SAB <- Student_Attitude_and_Behavior %>%
+  rename(degree_prefer = Do.you.like.your.degree.) %>%
+  rename(career_willingness = willingness.to.pursue.a.career.based.on.their.degree)%>%
+  mutate(Department = gsub("B.com ISM", "ISM", Department))%>%
+  mutate(Department = gsub("B.com Accounting and Finance ", "Accounting and Finance", Department))
+```
+
+
+```{r}
+sum(is.na(SAB))
+
+summary(SAB)
+```
+
+
+## Tab 3
+
+### An interactive table
+```{r tab-tab3, messages=FALSE, warning= FALSE}
+#| collapse = TRUE
+
+datatable(SAB, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+```
+
+
+
+
+
+# Graphs for the Dataset
+
+
+## Qualitative Variable
+
+Based on the dataset, we can see that males outnumber females. Also, we are interested in the distribution of gender across other variables.
+```{r}
+# We delete other bars only preserve the gender bar plot
+
+bar1<- ggplot(SAB, aes(x= Gender))+
+  geom_bar(fill="skyblue")+
+  labs(title ="Gender Distribution")
+
+bar1
+```
+
+Seperate Male and Female students
+```{r}
+SAB_male<-SAB%>%
+  filter(Gender == "Male")
+
+SAB_female<-SAB%>%
+  filter(Gender == "Female")
+
+bar_male<- ggplot(SAB_male, aes(x= Gender,fill= daily.studing.time))+
+  geom_bar()
+
+
+bar_female<- ggplot(SAB_female, aes(x= Gender, fill= daily.studing.time))+
+  geom_bar()
+
+bar_male+bar_female
+
+```
+
+```{r}
+ggplot(SAB, aes(x= Gender, fill= daily.studing.time))+
+  geom_bar()
+```
+
+Below is the distribution of students' time spent on social media and travelling time.
+```{r}
+
+bar4<- ggplot(SAB, aes(x= social.medai...video))+
+  geom_bar(fill="skyblue")+
+  theme(axis.text.x= element_text(angle = 45, hjust = 1))
+
+
+bar5<- ggplot(SAB, aes(x= Travelling.Time))+
+  geom_bar(fill="skyblue")+
+  theme(axis.text.x= element_text(angle = 45, hjust = 1))
+
+bar4+bar5
+```
+
+We create some plot that compares gender across departments and certification levels.
+```{r}
+#we add percentage point here
+
+SAB %>%
+  count(Department, Gender) %>%
+  group_by(Department) %>%
+  mutate(perc = n / sum(n) * 100) %>%
+  ggplot(aes(x = Department, y = n, fill = Gender, label = sprintf("%.1f%%", perc))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(position = position_dodge(width = 0.9), vjust = -0.25, size = 3) + 
+  labs(title = "Department vs Gender", x = "Department", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Based on the distribution, we found that most of the students completed certification course.
+```{r}
+# We recreate the bar plot by changing x and y
+
+ggplot(SAB, aes(x = Gender, fill = Certification.Course)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Certification.Course vs Gender", x = "Count", y = "Certification.Course") +
+  theme_minimal()
+```
+
+
+Here is the stress level among gender, most of the students are in good status.
+```{r messages=FALSE, warning= FALSE}
+#we add percentage point here
+
+stress_gender <- SAB %>%
+  group_by(Stress.Level, Gender) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(Gender) %>%
+  mutate(percentage = (count / sum(count)) * 100)
+
+ggplot(stress_gender, aes(x = Gender, y = count, fill = Stress.Level)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)), 
+            position = position_dodge(width = 0.9), vjust = -0.5, size = 2.5) + 
+  labs(title = "Gender vs Stress", x = "Gender", y = "Count") +
+  theme_minimal()
+```
+
+
+Here is the breakdown of hobbies and study time. Most of them study for 30 to 60 minutes. We discovered that students who play video games cannot study for more than four hours.
+```{r messages=FALSE, warning= FALSE}
+# We add the daily.studing.time bar here
+
+hobby_studytime<- SAB%>% 
+  group_by(hobbies, daily.studing.time) %>% 
+  summarise(count = n())
+
+study1<- ggplot(hobby_studytime, aes(x = hobbies, y = count, fill = daily.studing.time)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "hobby v.s. studytime", x = "hobbies", y = "Count") +
+  theme_minimal()+
+  theme(axis.text.x= element_text(angle = 45, hjust = 1))
+
+study2<-ggplot(SAB, aes(x=daily.studing.time ))+
+  geom_bar(fill= "skyblue")+
+  theme(axis.text.x= element_text(angle = 45, hjust = 1))
+
+study1+study2
+```
+
+
+
+
+
+# Academic performace among Gender
+
+```{r}
+plota <- ggplot(SAB, aes(x = X12th.Mark, y = college.mark, color = Gender, shape= Gender)) +
+  geom_jitter(alpha = 1/2, size = 1)+ 
+  geom_smooth(method = "lm", se = FALSE)+
+  labs(title = "12th grade vs. college.mark among Gender")
+
+ggplotly(plota)
+
+plotb <- ggplot(SAB, aes(x = X10th.Mark, y = college.mark, color = Gender, shape= Gender)) +
+  geom_jitter(alpha = 1/2, size = 1)+ 
+  geom_smooth(method = "lm", se = FALSE)+
+  labs(title = "10th grade vs. college.mark among Gender")
+ggplotly(plotb)
+
+```
+
+
+```{r messages=FALSE, warning= FALSE}
+gradeplot1<- ggplot(SAB, aes(x=X10th.Mark, y=college.mark))+
+  geom_point(color="#a6bddb")+
+  geom_smooth(method= "lm")+
+  labs(title = "10th grade vs. college.mark")
+
+gradeplot2<- ggplot(SAB, aes(x=X12th.Mark, y=college.mark))+
+  geom_point(color="#a6bddb")+
+  geom_smooth(method= "lm")+
+  labs(title = "10th grade vs. college.mark")
+
+gradeplot1+gradeplot2
+```
+
+## Fit the linear model
+
+### Score with Gender
+
+```{r}
+lm_score<- lm(college.mark~ X10th.Mark+ X12th.Mark+ Gender, SAB)
+tidy(lm_score, conf.int = T)
+```
+
+$Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \beta_3X_{i3}+ \epsilon_i$,
+
+$Y_i$ is the student's marks obtained in college or university,
+
+$X_{i1}$ is the student's marks obtained in the 10th grade i,
+
+$X_{i1}$ is the student's marks obtained in the 10th grade i,
+
+$X_{i3}$ is an indicator for male i,
+
+The errors are assumed to have mean 0, constant variance, and are uncorrelated.
+
+The output shows that female students have better academic performance than male's. Female students have 6.6 higher score, on average, as male students who have the same 10th grade and the same 12th grade.
+
+
+```{r}
+lm_score11<- lm(college.mark~ X10th.Mark+ X12th.Mark+ part.time.job, SAB)
+tidy(lm_score11, conf.int = T)
+```
+
+### Score without Gender
+```{r}
+lm_score2<- lm(college.mark~ X10th.Mark+X12th.Mark, SAB)
+tidy(lm_score2, conf.int = T)
+```
+
+### Regression Residuals Diagnostics
+
+#### Plot of residuals vs fitted values
+
+```{r}
+aout <- augment(lm_score2)
+ggplot(data = aout, mapping = aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0)+
+  geom_smooth()
+```
+
+Residuals seem to be centered at 0 for all X, we conclude that a linear model is appropriate.
+
+#### QQ plot of residuals
+
+
+We need to check for normality to verify that we can do a prediction interval 
+```{r}
+ggplot(data = aout, mapping = aes(sample = .resid)) +
+  geom_qq() +
+  geom_qq_line(color="blue")
+```
+This evaluates the normality of the error terms. Although it has a left long tail, overall looks good.
+
+### Prediction 
+
+```{r}
+range(SAB$X10th.Mark)
+range(SAB$X12th.Mark)
+df1 <- data.frame(X10th.Mark = c(70, 80), X12th.Mark= c(34, 87))
+predict(lm_score2, newdata = df1, interval = "confidence")
+```
+
+Based on the output provided, we predict that students who score 70 points in the 10th grade and 34 points in the 12th grade are likely to achieve around 55 points for their college grade. (95% Confident Interval 49 to 61) Students obtained 80 points in the 10th grade, and 87 points in the 12th grade will get about 79 points for college grade.(95% Confident Interval 75 to 82)
+
+
+
+# Career Orientation and Academic Choices
+
+- How does satisfaction with their degree influence students' willingness to pursue a career in their field of study?
+```{r}
+SAB_degree<-SAB%>%
+  group_by(degree_prefer)%>%
+  count()%>%
+  mutate(frequency = n / 235)
+
+SAB_degree2<-SAB%>%
+  group_by(degree_prefer, Department)%>%
+  count()%>%
+  mutate(frequency = n / 235)
+
+SAB_degree
+SAB_degree2
+```
+91% of student like their degree, especially the The Business Cinematic Arts (BCA) program(49%).
+
+
+
+- Are students who complete certification courses more likely to have higher salary expectations and a willingness to pursue related careers?
+
+
+```{r}
+t.test(SAB$salary.expectation ~ SAB$Certification.Course)
+```
+Since the p-value (0.1058) is greater than 0.05, we fail to reject the null hypothesis. There is not enough evidence that there is a significant difference in mean salary expectations between students who completed certification courses and those who did not.
+
+
+```{r}
+SAB%>%
+  group_by(Gender , Certification.Course) %>%
+  summarise(MeanSalary = mean(salary.expectation))
+```
+
+
+
+# Appendix
+
+```{r Appendix}
+#| ref.label=knitr::all_labels(),
+#| echo = TRUE,
+#| eval = FALSE
+```
