@@ -1,5 +1,5 @@
 ---
-title: "Analysis of Behavior and Attitudes of College Students"
+title: "Analysis Behavior and Attitudes of College Students"
 author: "Yen Jo (Sally) Lee"
 date: "`r Sys.Date()`"
 output:
